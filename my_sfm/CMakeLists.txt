@@ -1,0 +1,4 @@
+ADD_SUBDIRECTORY(data_structures)
+ADD_SUBDIRECTORY(data_association)
+ADD_SUBDIRECTORY(database)
+ADD_SUBDIRECTORY(reconstruction)
