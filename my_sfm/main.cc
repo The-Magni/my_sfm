@@ -1,0 +1,21 @@
+#include "data_association.h"
+#include "keypoints.h"
+#include "descriptors.h"
+#include "reconstruction.h"
+#include "two_view_geometries.h"
+#include <memory>
+#include <opencv2/core/types.hpp>
+
+int main()
+{
+    std::shared_ptr<Images> imgs(new Images("/home/dinh/my_sfm/data/images"));
+    std::shared_ptr<KeyPointsDB> db(new KeyPointsDB("/home/dinh/my_sfm/data/database.db"));
+    std::shared_ptr<DescriptorsDB> db1(new DescriptorsDB("/home/dinh/my_sfm/data/database.db"));
+    std::shared_ptr<TwoViewGeometriesDB> db2(new TwoViewGeometriesDB("/home/dinh/my_sfm/data/database.db"));
+    DataAssociation da;
+    // da.Init(imgs, db, db1, db2);
+    // da.Process();
+    Reconstruction recon;
+    recon.Init(db2, imgs, db);
+    return 0;
+}

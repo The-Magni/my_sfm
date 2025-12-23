@@ -1,5 +1,7 @@
 #include "thread_pool.h"
 
+// copy from geeksforgeeks
+
 ThreadPool::ThreadPool(size_t num_threads)
 {
     // Creating worker threads

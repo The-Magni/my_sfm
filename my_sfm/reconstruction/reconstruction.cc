@@ -2,19 +2,16 @@
 #include "images.h"
 #include "keypoints.h"
 #include "opencv2/calib3d.hpp"
-#include "opencv2/core/hal/interface.h"
+#include "opencv2/core.hpp"
+#include "opencv2/core/base.hpp"
 #include "opencv2/core/mat.hpp"
+#include "opencv2/core/matx.hpp"
 #include "opencv2/core/types.hpp"
+#include "optimization.h"
 #include "two_view_geometries.h"
+#include <cmath>
 #include <memory>
-
-cv::Mat Reconstruction::Rt2T(const cv::Mat &R, const cv::Mat &t)
-{
-    cv::Mat T = cv::Mat::eye(4, 4, CV_64F);
-    R.copyTo(T(cv::Rect(0, 0, 3, 3)));
-    t.copyTo(T(cv::Rect(3, 0, 1, 3)));
-    return T;
-}
+#include <vector>
 
 /*
  * Assume the following
@@ -27,25 +24,31 @@ bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std:
     two_view_db_ = two_view_db;
     img_ = img;
     key_points_db_ = key_points_db;
-    // init K to default value due to uncalirated cam
-    cv::Mat R, t, P1, P2 = cv::Mat::eye(4, 4, CV_64F);
-    cv::Mat K = cv::Mat::eye(3, 3, CV_64F);
-    cv::Mat sample = img_->loadImages(0);
+    // initialize camera parameters to default value
+    cameras.reserve(img_->getNumImgs());
+    cv::Mat sample;
+    for (unsigned int i = 0; i < img_->getNumImgs(); i++) {
+        sample = img_->loadImages(i);
+        cameras.emplace_back(sample.cols, sample.rows); // initialuze the camera parameters to default value
+    }
     std::vector<cv::KeyPoint> keypoints1, keypoints2;
-    std::vector<cv::Point2f> points1, points2;
-    double f = 1.2 * std::max(sample.rows, sample.cols);
-    double px = (double) sample.cols / 2;
-    double py = (double) sample.rows / 2;
-    K.at<double>(0, 0) = f;
-    K.at<double>(0, 2) = px;
-    K.at<double>(1, 1) = f;
-    K.at<double>(1, 2) = py;
+    std::vector<cv::Point2f> points1, points2, points1_undistorted, points2_undistorted;
     // choose initial 2 non-panoramic views and get E
     unsigned int img1_id, img2_id;
     std::vector<Match> inlier_correspondences;
     cv::Mat F, E;
+
     two_view_db_->RetrieveBestTwoView(img1_id, img2_id, inlier_correspondences, F);
-    E = K.t() * F * K;
+
+    // do something fishy
+    cv::Matx33d K1 = cameras[img1_id].getIntrinsicMat();
+    cv::Matx33d K2 = cameras[img2_id].getIntrinsicMat();
+    cv::Vec4d distCoeffs1 = cameras[img1_id].getDistCoeff();
+    cv::Vec4d distCoeffs2 = cameras[img2_id].getDistCoeff();
+    two_view_db_->RetrieveBestTwoView(img1_id, img2_id, inlier_correspondences, F);
+    cv::SVD svd(F, cv::SVD::NO_UV);
+    cv::Mat s = svd.w;
+    E = K2.t() * F * K1;
     // retrieve keypoints and construct matching points
     key_points_db_->Retrieve(img1_id, keypoints1);
     key_points_db_->Retrieve(img2_id, keypoints2);
@@ -55,12 +58,49 @@ bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std:
     }
 
     // lets go triangulation
-    cv::recoverPose(E, points1, points2, R, t, f, cv::Point2d(px, py), cv::noArray());
-    P1 = K * cv::Mat::eye(4, 4, CV_64F);
-    P2 = K * Rt2T(R, t);
-    cv::triangulatePoints(P1, P2, points1, points2, points4D);
+    cv::Matx33d R;
+    cv::Vec3d t;
+    cv::Mat points3D, points4D, img1, img2;
+    unsigned int N = inlier_correspondences.size();
+    CV_Assert(E.cols == 3 && E.rows == 3);
+    cv::undistortPoints(points1, points1_undistorted, K1, distCoeffs1);
+    cv::undistortPoints(points2, points2_undistorted, K2, distCoeffs2);
+    // already normalize t to 1
+    cv::recoverPose(E, points1_undistorted, points2_undistorted, R, t);
+    cameras[img2_id].updatePose(R, t);
+    // undistort points already return pixels in normalized space so take Rt as P
+    cv::Mat points1_mat(2, N, CV_32F), points2_mat(2, N, CV_32F);
+    for (unsigned int i = 0; i < N; i++) {
+        points1_mat.at<float>(0, i) = points1_undistorted[i].x;
+        points1_mat.at<float>(1, i) = points1_undistorted[i].y;
+        points2_mat.at<float>(0, i) = points2_undistorted[i].x;
+        points2_mat.at<float>(1, i) = points2_undistorted[i].y;
 
+    }
+    cv::triangulatePoints(cameras[img1_id].getExtrinsicMat(), cameras[img2_id].getExtrinsicMat(), points1_mat, points2_mat, points4D);
+    cv::convertPointsFromHomogeneous(points4D.t(), points3D);
+
+    // add them to the point cloud
+    img1 = img_->loadImages(img1_id);
+    img2 = img_->loadImages(img2_id);
+    for (unsigned int i = 0; i < N; i++) {
+        cv::Vec3b color1 = img1.at<cv::Vec3b>((int) std::round(points1[i].y), (int) std::round(points1[i].x));
+        cv::Vec3b color2 = img2.at<cv::Vec3b>((int) std::round(points2[i].y), (int) std::round(points2[i].x));
+        cv::Vec3b color = (color1 + color2) / 2;
+        cv::Vec3d xyz(
+            points3D.at<double>(0, i),
+            points3D.at<double>(1, i),
+            points3D.at<double>(2, i)
+        );
+        Point point(xyz, color);
+        point.addObservation(img1_id, inlier_correspondences[i].idx1);
+        point.addObservation(img2_id, inlier_correspondences[i].idx2);
+        pointcloud.addPoint(point);
+    }
     // lets go bundle adjustment
+    optimize(pointcloud, cameras, key_points_db_, img1_id);
 
+    std::cout << cameras[img1_id].getIntrinsicMat() << '\n' << cameras[img2_id].getExtrinsicMat() << '\n';
+    std::cout << img1_id << " " << img2_id << " " << N << '\n';
     return true;
 }
