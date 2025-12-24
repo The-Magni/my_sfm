@@ -85,30 +85,18 @@ cv::Vec4d Camera::getDistCoeff()
 void Camera::updatePose(const cv::Matx33d &R, const cv::Vec3d &t)
 {
     cv::Matx34d Rt = getExtrinsicMat();
-    cv::Matx44d Rt_homo = cv::Matx44d::eye();
-    for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 4; j++)
-            Rt_homo(i, j) = Rt(i, j);
-
-    cv::Matx34d T;
-    cv::Matx44d T_homo = cv::Matx44d::eye();
-    cv::hconcat(R, t, T);
-    for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 4; j++)
-            T_homo(i, j) = T(i, j);
-
-    cv::Matx44d new_Rt_homo = Rt_homo * T_homo;
-    cv::Matx33d new_R;
-    cv::Vec3d new_t, new_rvec;
-    for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++)
-            new_R(i, j) = new_Rt_homo(i, j);
-    for (int i = 0; i < 3; i++)
-        new_t[i] = new_Rt_homo(i, 3);
-
-    cv::Rodrigues(new_R, new_rvec);
+    cv::Matx33d this_R;
+    cv::Vec3d this_t, this_rvec;
     for (int i = 0; i < 3; i++) {
-        extrinsic[i] = new_rvec[i];
-        extrinsic[i+3] = new_t[i];
+        this_t[i] = Rt(i, 3);
+        for (int j = 0; j < 3; j++)
+            this_R(i, j) = Rt(i, j);
+    }
+    this_t = this_R * t + this_t;
+    this_R = this_R * R;
+    cv::Rodrigues(this_R, this_rvec);
+    for (int i = 0; i < 3; i++) {
+        extrinsic[i] = this_rvec[i];
+        extrinsic[i+3] = this_t[i];
     }
 }

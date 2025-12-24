@@ -1,5 +1,4 @@
 ADD_LIBRARY(data_structures
-    scene_graph.cc
     images.cc
     thread_pool.cc
     camera.cc
