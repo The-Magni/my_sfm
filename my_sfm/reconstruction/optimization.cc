@@ -109,9 +109,7 @@ void optimize(
                 point.getPt()
             );
             problem.SetParameterBlockConstant(cameras[observation.img_id].getPpConst());
-            // set bound for focal length
-            problem.SetParameterLowerBound(cameras[observation.img_id].getIntrinsicParams(), 0, 1000);
-            problem.SetParameterUpperBound(cameras[observation.img_id].getIntrinsicParams(), 0, 5000);
+            problem.SetParameterBlockConstant(cameras[observation.img_id].getIntrinsicParams());
         }
     }
     // fix initial camera pose

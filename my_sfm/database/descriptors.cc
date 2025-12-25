@@ -52,7 +52,7 @@ bool DescriptorsDB::Insert(unsigned int img_id, const cv::Mat &descriptors)
         4,
         descriptors.data,
         descriptors.rows * descriptors.cols * descriptors.elemSize(),
-        SQLITE_STATIC
+        SQLITE_TRANSIENT
     );
 
     rc = sqlite3_step(stmt);

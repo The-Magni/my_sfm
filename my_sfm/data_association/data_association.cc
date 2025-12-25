@@ -135,7 +135,6 @@ void DataAssociation::Process()
         keypoints_db_->Insert(i, k);
         descriptors_db_->Insert(i, d);
     }
-
     // step 2: feature matching and step 3: geometric verification
     // using  exhaustive search here due to laziness
     ThreadPool threads;

@@ -1,5 +1,4 @@
 #include "two_view_geometries.h"
-#include "keypoints.h"
 #include "opencv2/core/base.hpp"
 #include "opencv2/core/hal/interface.h"
 #include <cassert>
@@ -10,9 +9,9 @@
 unsigned long long TwoViewGeometriesDB::imgIdsToPairId(unsigned int img1_id, unsigned int img2_id)
 {
     if (img1_id > img2_id)
-        return MAX_INT * img2_id + img1_id;
+        return static_cast<unsigned long long>(MAX_INT) * img2_id + img1_id;
     else
-        return MAX_INT * img1_id + img2_id;
+        return static_cast<unsigned long long>(MAX_INT) * img1_id + img2_id;
 }
 
 void TwoViewGeometriesDB::pairIdToImgIds(unsigned long long pair_id, unsigned int &img1_id, unsigned int &img2_id)
@@ -53,7 +52,7 @@ bool TwoViewGeometriesDB::Insert(
     const std::vector<Match> &inlier_correspondences,
     const cv::Mat &F
 ) {
-    thread_local sqlite3 *db;
+    thread_local sqlite3 *db = nullptr;
     sqlite3_stmt *stmt = nullptr;
     int rc;
     std::stringstream ss;
@@ -73,12 +72,11 @@ bool TwoViewGeometriesDB::Insert(
     CV_Assert(F.cols == 3);
     CV_Assert(F.isContinuous());
 
-
     sqlite3_bind_int64(stmt, 1, pair_id);
     sqlite3_bind_int(stmt, 2, inlier_correspondences.size());
     sqlite3_bind_int(stmt, 3, cols);
     sqlite3_bind_blob(stmt, 4, inlier_correspondences.data(), inlier_correspondences.size() * sizeof(Match), SQLITE_TRANSIENT);
-    sqlite3_bind_blob(stmt, 5, F.data, F.rows * F.cols * F.elemSize(), SQLITE_STATIC);
+    sqlite3_bind_blob(stmt, 5, F.data, F.rows * F.cols * F.elemSize(), SQLITE_TRANSIENT);
 
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
@@ -97,7 +95,7 @@ bool TwoViewGeometriesDB::Retrieve(
     std::vector<Match> &inlier_correspondences,
     cv::Mat &F
 ) {
-    thread_local sqlite3 *db;
+    thread_local sqlite3 *db = nullptr;
     sqlite3_stmt *stmt = nullptr;
     int rc;
     std::stringstream ss;
@@ -114,6 +112,7 @@ bool TwoViewGeometriesDB::Retrieve(
     // no data is found (no edge between 2 images in the scene graph)
     if (rc == SQLITE_DONE) {
         std::cout << "No edge between image id " << img1_id << " and " << img2_id << '\n';
+        sqlite3_finalize(stmt);
         return false;
     }
     if (rc != SQLITE_ROW) {
@@ -148,7 +147,7 @@ bool TwoViewGeometriesDB::RetrieveBestTwoView(
     std::vector<Match> &inlier_correspondences,
     cv::Mat &F
 ) {
-    thread_local sqlite3 *db;
+    thread_local sqlite3 *db = nullptr;
     sqlite3_stmt *stmt = nullptr;
     int rc;
     std::stringstream ss;

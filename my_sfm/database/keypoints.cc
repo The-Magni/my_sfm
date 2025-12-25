@@ -55,7 +55,7 @@ KeyPointsDB::KeyPointsDB(const std::string &db_name)
 
 bool KeyPointsDB::Insert(unsigned int img_id, const std::vector<cv::KeyPoint> &keypoints)
 {
-    thread_local sqlite3 *db;
+    thread_local sqlite3 *db = nullptr;
     sqlite3_stmt *stmt = nullptr;
     int rc;
     std::stringstream ss;
@@ -89,7 +89,7 @@ bool KeyPointsDB::Insert(unsigned int img_id, const std::vector<cv::KeyPoint> &k
 
 bool KeyPointsDB::Retrieve(unsigned int img_id, std::vector<cv::KeyPoint> &keypoints)
 {
-    thread_local sqlite3 *db;
+    thread_local sqlite3 *db = nullptr;
     sqlite3_stmt *stmt = nullptr;
     int rc;
     std::stringstream ss;
@@ -109,7 +109,7 @@ bool KeyPointsDB::Retrieve(unsigned int img_id, std::vector<cv::KeyPoint> &keypo
         return false;
     }
 
-    int rows = sqlite3_column_int(stmt, 0);
+    unsigned int rows = sqlite3_column_int(stmt, 0);
     const void *blob = sqlite3_column_blob(stmt, 2);
     int bytes = sqlite3_column_bytes(stmt, 2);
 

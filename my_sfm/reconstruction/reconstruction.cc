@@ -12,12 +12,6 @@
 #include <memory>
 #include <vector>
 
-/*
- * Assume the following
- * All images are captured by the same camera (same instrinic and same resolution)
- * Camera are uncalirated
- * Using pinhole model
- */
 bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std::shared_ptr<Images> img, std::shared_ptr<KeyPointsDB> key_points_db)
 {
     two_view_db_ = two_view_db;
