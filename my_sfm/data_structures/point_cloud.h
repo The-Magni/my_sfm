@@ -1,6 +1,8 @@
 #pragma once
 
 #include "opencv2/core/matx.hpp"
+#include <cstddef>
+#include <functional>
 #include <vector>
 
 /** storing 3D-2D correspondences */
@@ -12,6 +14,18 @@ struct Observation {
     {
         this->img_id = img_id;
         this->point_id = point_id;
+    }
+
+    bool operator==(const Observation &other) const
+    {
+        return img_id == other.img_id && point_id == other.point_id;
+    }
+};
+
+struct ObservationHash {
+    std::size_t operator()(const Observation &o) const noexcept
+    {
+        return std::hash<unsigned int>()(o.img_id) ^ (std::hash<unsigned int>()(o.point_id) << 1);
     }
 };
 

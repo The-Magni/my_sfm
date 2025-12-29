@@ -5,23 +5,22 @@
 
 class Camera {
     private:
-        /* 3 for rotation, 3 for translation */
-        std::array<double, 6> extrinsic = {0};
-        /* 1 for focal length, 2 for radial distortions */
-        std::array<double, 3> intrinsic = {0};
-        /* 2 for principal points */
-        std::array<double, 2> pp;
+        /* quartenion represent rotation */
+        std::array<double, 4> q;
+        std::array<double, 3> trans;
+        /* intrinsic parameters: f, px, py, k */
+        std::array<double, 4> intrinsic;
 
     public:
         Camera(unsigned int img_width, unsigned int img_height);
 
         cv::Vec2d project(cv::Vec3d point3D);
 
-        double *getExtrinsicParams();
+        double *getQuartenionParams();
+
+        double *getTranslationParams();
 
         double *getIntrinsicParams();
-
-        double *getPpConst();
 
         cv::Matx34d getProjectionMat();
 

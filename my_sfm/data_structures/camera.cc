@@ -1,42 +1,49 @@
 #include "camera.h"
-#include "opencv2/calib3d.hpp"
 #include "opencv2/core.hpp"
 #include "opencv2/core/mat.hpp"
 #include "opencv2/core/matx.hpp"
+#include <opencv2/core/quaternion.hpp>
 #include <algorithm>
 
 Camera::Camera(unsigned int img_width, unsigned int img_height)
 {
+    // init intrinsic to arbitrary value
     double f = (double) 1.2 * std::max(img_width, img_height);
     double px = (double) img_width / 2;
     double py = (double) img_height / 2;
 
     intrinsic[0] = f;
-    pp[0] = px;
-    pp[1] = py;
+    intrinsic[1] = px;
+    intrinsic[2] = py;
+    intrinsic[3] = 0;
+    // init quartenion to no rotation
+    q = {1, 0, 0, 0};
+    // init t to all 0
+    trans = {0, 0, 0};
 }
 
 cv::Vec2d Camera::project(cv::Vec3d point3D)
 {
     cv::Vec2d point2D;
     cv::Matx33d R;
-    cv::Vec3d rvec(extrinsic[0], extrinsic[1], extrinsic[2]), t(extrinsic[3], extrinsic[4], extrinsic[5]), point3Dcam;
-    cv::Rodrigues(rvec, R);
-    double f = intrinsic[0], px = pp[0], py = pp[1], l1 = intrinsic[1], l2 = intrinsic[2];
+    cv::Vec3d t(trans[0], trans[1], trans[2]), point3Dcam;
+    cv::Quatd quat(q[0], q[1], q[2], q[3]);
+    R = quat.toRotMat3x3();
+    double f = intrinsic[0], px = intrinsic[1], py = intrinsic[2], k = intrinsic[3];
     point3Dcam = R * point3D + t;
     point2D[0] = point3Dcam[0] / point3Dcam[2];
     point2D[1] = point3Dcam[1] / point3Dcam[2];
     double r2 = point2D[0] * point2D[0] + point2D[1] * point2D[1];
-    double distortion = 1.0 + l1 * r2 + l2 * r2 * r2;
+    double distortion = 1.0 + k * r2;
 
     point2D[0] = f * distortion * point2D[0] + px;
     point2D[1] = f * distortion * point2D[1] + py;
     return point2D;
 }
 
-double *Camera::getExtrinsicParams()
+double *Camera::getQuartenionParams()
 {
-    return extrinsic.data();
+    return q.data();
 }
 
 double *Camera::getIntrinsicParams()
@@ -44,9 +51,9 @@ double *Camera::getIntrinsicParams()
     return intrinsic.data();
 }
 
-double *Camera::getPpConst()
+double *Camera::getTranslationParams()
 {
-    return pp.data();
+    return trans.data();
 }
 
 cv::Matx34d Camera::getProjectionMat()
@@ -61,8 +68,9 @@ cv::Matx34d Camera::getExtrinsicMat()
 {
     cv::Matx34d Rt;
     cv::Matx33d R;
-    cv::Vec3d rvec(extrinsic[0], extrinsic[1], extrinsic[2]), t(extrinsic[3], extrinsic[4], extrinsic[5]);
-    cv::Rodrigues(rvec, R);
+    cv::Vec3d t(trans[0], trans[1], trans[2]);
+    cv::Quatd quat(q[0], q[1], q[2], q[3]);
+    R = quat.toRotMat3x3();
     cv::hconcat(R, t, Rt);
     return Rt;
 }
@@ -71,32 +79,21 @@ cv::Matx33d Camera::getIntrinsicMat()
 {
     cv::Matx33d K = cv::Matx33d::eye();
     K(0, 0) = intrinsic[0];
-    K(0, 2) = pp[0];
+    K(0, 2) = intrinsic[1];
     K(1, 1) = intrinsic[0];
-    K(1, 2) = pp[1];
+    K(1, 2) = intrinsic[2];
     return K;
 }
 
 cv::Vec4d Camera::getDistCoeff()
 {
-    return cv::Vec4d(intrinsic[1], intrinsic[2], 0.0, 0.0);
+    return cv::Vec4d(intrinsic[3], 0.0, 0.0, 0.0);
 }
 
 void Camera::updatePose(const cv::Matx33d &R, const cv::Vec3d &t)
 {
-    cv::Matx34d Rt = getExtrinsicMat();
-    cv::Matx33d this_R;
-    cv::Vec3d this_t, this_rvec;
-    for (int i = 0; i < 3; i++) {
-        this_t[i] = Rt(i, 3);
-        for (int j = 0; j < 3; j++)
-            this_R(i, j) = Rt(i, j);
-    }
-    this_t = this_R * t + this_t;
-    this_R = this_R * R;
-    cv::Rodrigues(this_R, this_rvec);
-    for (int i = 0; i < 3; i++) {
-        extrinsic[i] = this_rvec[i];
-        extrinsic[i+3] = this_t[i];
-    }
+    cv::Quatd quat = cv::Quatd::createFromRotMat(R);
+    q = {quat.w, quat.x, quat.y, quat.z};
+
+    trans = {t[0], t[1], t[2]};
 }

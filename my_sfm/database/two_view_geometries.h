@@ -2,15 +2,18 @@
 
 #include "opencv2/core/mat.hpp"
 #include <sqlite3.h>
-#include <sstream>
 #include <string>
 #include <vector>
 
 #define MAX_INT 2147483647
 
 struct Match {
-    int idx1;
-    int idx2;
+    unsigned int idx1;
+    unsigned int idx2;
+
+    bool operator==(const Match &other) const {
+        return other.idx1 == idx1 && other.idx2 == idx2;
+    }
 };
 
 class TwoViewGeometriesDB {

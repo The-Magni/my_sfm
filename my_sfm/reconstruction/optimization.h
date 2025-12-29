@@ -9,6 +9,7 @@ void optimize(
     PointCloud &pointcloud,
     std::vector<Camera> &cameras,
     std::shared_ptr<KeyPointsDB> keypoints_db,
-    unsigned int fixed_img_id,
-    unsigned int second_img_id
+    unsigned int first_img_id,
+    unsigned int second_img_id,
+    bool is_first_two_views
 );

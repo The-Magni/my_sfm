@@ -73,7 +73,9 @@ bool DataAssociation::geometricVerification(
             num_H_inliers++;
         if (inlier_mask.at<uchar>(i) != 0) {
             num_inliers++;
-            Match match{good_matches[i].queryIdx, good_matches[i].trainIdx};
+            if (good_matches[i].queryIdx < 0 || good_matches[i].trainIdx < 0)
+                continue;
+            Match match{static_cast<unsigned int>(good_matches[i].queryIdx), static_cast<unsigned int>(good_matches[i].trainIdx)};
             inlier_correspondences.push_back(match);
         }
     }
