@@ -3,6 +3,7 @@
 #include "opencv2/core/hal/interface.h"
 #include <cassert>
 #include <cstring>
+#include <glog/logging.h>
 #include <iostream>
 #include <sstream>
 
@@ -80,7 +81,7 @@ bool TwoViewGeometriesDB::Insert(
 
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
-        std::cout << "Fail to insert two_view " << sqlite3_errmsg(db) << '\n';
+        LOG(WARNING) << "Fail to insert two_view " << sqlite3_errmsg(db) << '\n';
         sqlite3_finalize(stmt);
         return false;
     }
@@ -111,12 +112,12 @@ bool TwoViewGeometriesDB::Retrieve(
 
     // no data is found (no edge between 2 images in the scene graph)
     if (rc == SQLITE_DONE) {
-        std::cout << "No edge between image id " << img1_id << " and " << img2_id << '\n';
+        LOG(INFO) << "No edge between image id " << img1_id << " and " << img2_id << '\n';
         sqlite3_finalize(stmt);
         return false;
     }
     if (rc != SQLITE_ROW) {
-        std::cout << "Fail to retrieve two_view " << sqlite3_errmsg(db) << '\n';
+        LOG(WARNING) << "Fail to retrieve two_view " << sqlite3_errmsg(db) << '\n';
         sqlite3_finalize(stmt);
         return false;
     }
@@ -163,7 +164,7 @@ bool TwoViewGeometriesDB::RetrieveBestTwoView(
 
     // no data is found (no edge between 2 images in the scene graph)
     if (rc != SQLITE_ROW) {
-        std::cout << "Fail to retrieve best two_view " << sqlite3_errmsg(db) << '\n';
+        LOG(WARNING) << "Fail to retrieve best two_view " << sqlite3_errmsg(db) << '\n';
         sqlite3_finalize(stmt);
         return false;
     }

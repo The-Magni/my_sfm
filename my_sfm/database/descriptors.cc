@@ -1,6 +1,7 @@
 #include "descriptors.h"
 #include "opencv2/core/base.hpp"
 #include "opencv2/core/hal/interface.h"
+#include <glog/logging.h>
 
 DescriptorsDB::DescriptorsDB(std::string db_name)
 {
@@ -57,7 +58,7 @@ bool DescriptorsDB::Insert(unsigned int img_id, const cv::Mat &descriptors)
 
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
-        std::cout << "Fail to insert descriptors " << sqlite3_errmsg(db) << '\n';
+        LOG(WARNING) << "Fail to insert descriptors " << sqlite3_errmsg(db) << '\n';
         sqlite3_finalize(stmt);
         return false;
     }
@@ -80,7 +81,7 @@ bool DescriptorsDB::Retrieve(unsigned int img_id, cv::Mat &descriptors)
     sqlite3_bind_int(stmt, 1, img_id);
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_ROW) {
-        std::cout << "Fail to retrieve descriptors " << sqlite3_errmsg(db);
+        LOG(WARNING) << "Fail to retrieve descriptors " << sqlite3_errmsg(db);
         sqlite3_finalize(stmt);
         return false;
     }

@@ -8,10 +8,9 @@
 Camera::Camera(unsigned int img_width, unsigned int img_height)
 {
     // init intrinsic to arbitrary value
-    double f = (double) 1.2 * std::max(img_width, img_height);
-    double px = (double) img_width / 2;
-    double py = (double) img_height / 2;
-
+    double f = 1.2 * static_cast<double>(std::max(img_width, img_height));
+    double px = static_cast<double>(img_width) / 2;
+    double py = static_cast<double>(img_height) / 2;
     intrinsic[0] = f;
     intrinsic[1] = px;
     intrinsic[2] = py;

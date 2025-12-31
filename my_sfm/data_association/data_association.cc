@@ -6,6 +6,7 @@
 #include "opencv2/core/types.hpp"
 #include "thread_pool.h"
 #include "two_view_geometries.h"
+#include <glog/logging.h>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -94,7 +95,7 @@ void parellarizedMatchingVerification(
     std::mutex &read_count_mutex,
     unsigned int &read_count
 ) {
-    std::cout << "Matching image " << img1_id << ", " << img2_id << '\n';
+    LOG(INFO) << "Matching image " << img1_id << ", " << img2_id << '\n';
     cv::Mat descriptors1, descriptors2;
     std::vector<cv::KeyPoint> keypoints1, keypoints2;
     std::vector<cv::DMatch> good_matches;

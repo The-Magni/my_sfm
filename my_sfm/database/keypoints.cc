@@ -2,6 +2,7 @@
 #include "opencv2/core/types.hpp"
 #include <cstddef>
 #include <cstring>
+#include <glog/logging.h>
 #include <sstream>
 #include <sqlite3.h>
 #include <stdexcept>
@@ -78,7 +79,7 @@ bool KeyPointsDB::Insert(unsigned int img_id, const std::vector<cv::KeyPoint> &k
 
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
-        std::cout << "Fail to insert keypoints " << sqlite3_errmsg(db) << '\n';
+        LOG(WARNING) << "Fail to insert keypoints " << sqlite3_errmsg(db) << '\n';
         sqlite3_finalize(stmt);
         return false;
     }
@@ -104,7 +105,7 @@ bool KeyPointsDB::Retrieve(unsigned int img_id, std::vector<cv::KeyPoint> &keypo
 
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_ROW) {
-        std::cout << "Fail to retrieve keypoints " << sqlite3_errmsg(db) << '\n';
+        LOG(WARNING) << "Fail to retrieve keypoints " << sqlite3_errmsg(db) << '\n';
         sqlite3_finalize(stmt);
         return false;
     }

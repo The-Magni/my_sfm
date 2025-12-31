@@ -16,10 +16,12 @@ class Reconstruction {
         std::vector<Camera> cameras;
         PointCloud pointcloud;
         std::set<unsigned int> registered_img_ids;
+        std::array<unsigned int, 2> first_two_views;
 
         unsigned int findNextBestView(std::vector<Match> &correspondences2d3d);
 
     public:
         bool Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std::shared_ptr<Images> img, std::shared_ptr<KeyPointsDB> key_points_db);
         bool ImageRegistration();
+        bool IncrementalReconstruction();
 };

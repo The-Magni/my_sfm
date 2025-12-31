@@ -3,6 +3,7 @@
 #include "opencv2/core/matx.hpp"
 #include <cstddef>
 #include <functional>
+#include <unordered_map>
 #include <vector>
 
 /** storing 3D-2D correspondences */
@@ -53,6 +54,9 @@ struct Point {
 
 struct PointCloud {
     std::vector<Point> points;
+    std::unordered_map<Observation, unsigned int, ObservationHash> observation_to_point3d;
 
     void addPoint(const Point &point);
+
+    void addObservation(unsigned int idx, unsigned int img_id, unsigned int point_id);
 };

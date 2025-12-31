@@ -73,8 +73,7 @@ void optimize(
     std::vector<Camera> &cameras,
     std::shared_ptr<KeyPointsDB> keypoints_db,
     unsigned int first_img_id,
-    unsigned int second_img_id,
-    bool is_first_two_views
+    unsigned int second_img_id
 ) {
     ceres::Problem problem;
     std::map<unsigned int, std::vector<cv::KeyPoint>> cache;

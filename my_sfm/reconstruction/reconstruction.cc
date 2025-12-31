@@ -13,9 +13,9 @@
 #include <algorithm>
 #include <cmath>
 #include <glog/logging.h>
-#include <iostream>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 /** select the next image which has the largest number of 2D-3D correspondences */
@@ -24,13 +24,7 @@ unsigned int Reconstruction::findNextBestView(std::vector<Match> &correspondence
     unsigned int max_count = 0; // counting number of 3d points seen
     std::vector<Match> temp;
     unsigned int chosen_img_id = 0;
-    std::unordered_map<Observation, unsigned int, ObservationHash> observation_to_point3D;
-
-    for (unsigned int i = 0; i < pointcloud.points.size(); i++) {
-        for (const Observation &observation : pointcloud.points[i].observations) {
-            observation_to_point3D[observation] = i;
-        }
-    }
+    std::unordered_map<Observation, unsigned int, ObservationHash> &o_to_point = pointcloud.observation_to_point3d;
 
     std::vector<Match> matches;
     cv::Mat F;
@@ -45,18 +39,18 @@ unsigned int Reconstruction::findNextBestView(std::vector<Match> &correspondence
                 if (!two_view_db_->Retrieve(i, j, matches, F)) continue;
                 for (const Match &m : matches) {
                     const Observation o{j, m.idx2};
-                    if (observation_to_point3D.count(o) > 0 && !seen[observation_to_point3D[o]]) {
-                        temp.push_back(Match{m.idx1, observation_to_point3D[o]});
-                        seen[observation_to_point3D[o]] = true;
+                    if (o_to_point.count(o) > 0 && !seen[o_to_point[o]]) {
+                        temp.push_back(Match{m.idx1, o_to_point[o]});
+                        seen[o_to_point[o]] = true;
                     }
                 }
             } else {
                 if(!two_view_db_->Retrieve(j, i, matches, F)) continue;
                 for (const Match &m : matches) {
                     const Observation o{j, m.idx1};
-                    if (observation_to_point3D.count(o) > 0 && !seen[observation_to_point3D[o]]) {
-                        temp.push_back(Match{m.idx2, observation_to_point3D[o]});
-                        seen[observation_to_point3D[o]] = true;
+                    if (o_to_point.count(o) > 0 && !seen[o_to_point[o]]) {
+                        temp.push_back(Match{m.idx2, o_to_point[o]});
+                        seen[o_to_point[o]] = true;
                     }
                 }
             }
@@ -149,14 +143,11 @@ bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std:
         pointcloud.addPoint(point);
     }
     // lets go bundle adjustment
-    optimize(pointcloud, cameras, key_points_db_, img1_id, img2_id, true);
-    std::cout << cameras[img1_id].getIntrinsicMat() << '\n' << cameras[img2_id].getIntrinsicMat() << '\n' << cameras[img2_id].getExtrinsicMat() << '\n';
-    std::cout << cameras[img1_id].getDistCoeff() << '\n' << cameras[img2_id].getDistCoeff() << '\n';
+    optimize(pointcloud, cameras, key_points_db_, img1_id, img2_id);
     registered_img_ids.insert(img1_id);
     registered_img_ids.insert(img2_id);
-    for (const Point &p : pointcloud.points) {
-        std::cout << p.pt << '\n';
-    }
+    first_two_views[0] = img1_id;
+    first_two_views[1] = img2_id;
     return true;
 }
 
@@ -166,15 +157,18 @@ bool Reconstruction::ImageRegistration()
     unsigned int next_img_id = findNextBestView(correspondences2d3d);
     std::vector<cv::Point2d> img_points;
     std::vector<cv::Point3d> obj_points;
-    std::vector<cv::KeyPoint> keypoints;
+    std::unordered_set<unsigned int> seen; // store the 2d points index that already exist in 3d
     cv::Vec3d rvec, tvec;
     cv::Matx33d R;
-    key_points_db_->Retrieve(next_img_id, keypoints);
+    std::vector<cv::KeyPoint> chosen_keypoints, registered_keypoints;
     // add the observation
+    key_points_db_->Retrieve(next_img_id, chosen_keypoints);
+
     for (const Match &correspondence : correspondences2d3d) {
-        pointcloud.points[correspondence.idx2].addObservation(next_img_id, correspondence.idx1);
-        img_points.push_back(static_cast<cv::Point2d>(keypoints[correspondence.idx1].pt));
+        pointcloud.addObservation(correspondence.idx2, next_img_id, correspondence.idx1);
+        img_points.push_back(static_cast<cv::Point2d>(chosen_keypoints[correspondence.idx1].pt));
         obj_points.emplace_back(pointcloud.points[correspondence.idx2].pt);
+        seen.insert(correspondence.idx1);
     }
     CV_Assert(obj_points.size() == img_points.size());
     CV_Assert(obj_points.size() == correspondences2d3d.size());
@@ -190,6 +184,58 @@ bool Reconstruction::ImageRegistration()
     cv::Rodrigues(rvec, R);
     cameras[next_img_id].updatePose(R, tvec);
     // triangulate new 3d points with previously registered views
-    std::cout << next_img_id << " " << correspondences2d3d.size() << "\n" << cameras[next_img_id].getExtrinsicMat() << '\n';
+    std::vector<Match> inlier_correspondences, true_correspondeces;
+    cv::Mat F, points3D, points4D, img1, img2;
+
+
+    for (const unsigned int img_id : registered_img_ids) {
+        std::vector<cv::Point2f> points1, points2, points1_undistorted, points2_undistorted;
+        key_points_db_->Retrieve(img_id, registered_keypoints);
+        if (next_img_id < img_id) {
+            two_view_db_->Retrieve(next_img_id, img_id, inlier_correspondences, F);
+            true_correspondeces = inlier_correspondences;
+        } else {
+            two_view_db_->Retrieve(img_id, next_img_id, inlier_correspondences, F);
+            for (const Match &m : inlier_correspondences)
+                true_correspondeces.push_back(Match{m.idx2, m.idx1}); // reverse
+        }
+
+        for (const Match &m : true_correspondeces) {
+            if (seen.count(m.idx1) > 0)
+                continue;
+            points1.push_back(chosen_keypoints[m.idx1].pt);
+            points2.push_back(registered_keypoints[m.idx2].pt);
+        }
+
+        cv::undistortPoints(points1, points1_undistorted, cameras[next_img_id].getIntrinsicMat(), cameras[next_img_id].getDistCoeff());
+        cv::undistortPoints(points2, points2_undistorted, cameras[img_id].getIntrinsicMat(), cameras[img_id].getDistCoeff());
+        cv::triangulatePoints(
+            cameras[next_img_id].getExtrinsicMat(), cameras[img_id].getExtrinsicMat(), points1_undistorted, points2_undistorted, points4D
+        );
+        cv::convertPointsFromHomogeneous(points4D.t(), points3D);
+        img1 = img_->loadImages(next_img_id);
+        img2 = img_->loadImages(img_id);
+        for (int i = 0; i < points3D.rows; i++) {
+            cv::Vec3b color1 = img1.at<cv::Vec3b>((int) std::round(points1[i].y), (int) std::round(points1[i].x));
+            cv::Vec3b color2 = img2.at<cv::Vec3b>((int) std::round(points2[i].y), (int) std::round(points2[i].x));
+            cv::Vec3b color = (color1 + color2) / 2;
+            cv::Vec3f xyz = points3D.at<cv::Vec3f>(i, 0);
+            cv::Vec3d p(xyz[0], xyz[1], xyz[2]);
+            Point point(p, color);
+            point.addObservation(next_img_id, true_correspondeces[i].idx1);
+            point.addObservation(img_id, true_correspondeces[i].idx2);
+            pointcloud.addPoint(point);
+        }
+    }
+    optimize(pointcloud, cameras, key_points_db_, first_two_views[0], first_two_views[1]);
+    std::cout << cameras[first_two_views[0]].getIntrinsicMat() << '\n' << cameras[first_two_views[1]].getIntrinsicMat() << '\n' << cameras[next_img_id].getIntrinsicMat();
+    registered_img_ids.insert(next_img_id);
+    return true;
+}
+
+bool Reconstruction::IncrementalReconstruction()
+{
+    while (registered_img_ids.size() < img_->getNumImgs())
+        ImageRegistration();
     return true;
 }

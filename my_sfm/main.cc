@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
     // da.Process();
     Reconstruction recon;
     recon.Init(db2, imgs, db);
-    recon.ImageRegistration();
+    recon.IncrementalReconstruction();
     google::ShutdownGoogleLogging();
     return 0;
 }
