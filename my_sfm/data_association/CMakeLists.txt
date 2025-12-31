@@ -12,5 +12,5 @@ TARGET_LINK_LIBRARIES(data_association
 
 ADD_EXECUTABLE(test1 test.cc)
 TARGET_LINK_LIBRARIES(test1
-    PRIVATE data_association database SQLite::SQLite3 ${OpenCV_LIBS}
+    PRIVATE data_association database SQLite::SQLite3 ${OpenCV_LIBS} glog::glog
 )

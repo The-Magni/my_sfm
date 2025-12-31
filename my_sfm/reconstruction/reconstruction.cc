@@ -18,12 +18,14 @@
 #include <unordered_set>
 #include <vector>
 
+#define INVALID_IMG_ID 4294967295
+
 /** select the next image which has the largest number of 2D-3D correspondences */
 unsigned int Reconstruction::findNextBestView(std::vector<Match> &correspondences2d3d)
 {
-    unsigned int max_count = 0; // counting number of 3d points seen
+    unsigned int max_count = 8; // init to 8 points for stability of pnp algorithmg
     std::vector<Match> temp;
-    unsigned int chosen_img_id = 0;
+    unsigned int chosen_img_id = INVALID_IMG_ID;
     std::unordered_map<Observation, unsigned int, ObservationHash> &o_to_point = pointcloud.observation_to_point3d;
 
     std::vector<Match> matches;
@@ -155,6 +157,8 @@ bool Reconstruction::ImageRegistration()
 {
     std::vector<Match> correspondences2d3d;
     unsigned int next_img_id = findNextBestView(correspondences2d3d);
+    if (next_img_id == INVALID_IMG_ID) // no more next best view
+        return false;
     std::vector<cv::Point2d> img_points;
     std::vector<cv::Point3d> obj_points;
     std::unordered_set<unsigned int> seen; // store the 2d points index that already exist in 3d
@@ -183,15 +187,17 @@ bool Reconstruction::ImageRegistration()
         cv::SOLVEPNP_EPNP);
     cv::Rodrigues(rvec, R);
     cameras[next_img_id].updatePose(R, tvec);
+
     // triangulate new 3d points with previously registered views
     std::vector<Match> inlier_correspondences, true_correspondeces;
     cv::Mat F, points3D, points4D, img1, img2;
 
 
-    for (const unsigned int img_id : registered_img_ids) {
+    for (const unsigned int &img_id : registered_img_ids) {
         std::vector<cv::Point2f> points1, points2, points1_undistorted, points2_undistorted;
         key_points_db_->Retrieve(img_id, registered_keypoints);
-        if (next_img_id < img_id) {
+        true_correspondeces.clear(); // clear after every iteration
+        if (next_img_id < img_id) { // due to two view geometries table format
             two_view_db_->Retrieve(next_img_id, img_id, inlier_correspondences, F);
             true_correspondeces = inlier_correspondences;
         } else {
@@ -235,7 +241,9 @@ bool Reconstruction::ImageRegistration()
 
 bool Reconstruction::IncrementalReconstruction()
 {
-    while (registered_img_ids.size() < img_->getNumImgs())
-        ImageRegistration();
+    while (registered_img_ids.size() < img_->getNumImgs()) {
+        if(!ImageRegistration())
+            return false; // cannot register all the images
+    }
     return true;
 }

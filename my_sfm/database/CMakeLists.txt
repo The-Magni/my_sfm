@@ -12,4 +12,4 @@ ADD_EXECUTABLE(test2 test.cc)
 TARGET_LINK_LIBRARIES(database
     PUBLIC SQLite::SQLite3
 )
-TARGET_LINK_LIBRARIES(test2 PRIVATE database SQLite::SQLite3)
+TARGET_LINK_LIBRARIES(test2 PRIVATE database SQLite::SQLite3 glog::glog)

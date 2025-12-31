@@ -27,6 +27,7 @@ bool DataAssociation::Init(
 
 void DataAssociation::featureExtraction(unsigned int image_id, std::vector<cv::KeyPoint> &keypoints, cv::Mat &descriptors)
 {
+    LOG(INFO) << "Extracting feautures from image " << image_id << '\n';
     cv::Mat img = images_->loadImages(image_id);
     cv::Mat gray;
     cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
@@ -130,6 +131,7 @@ void parellarizedMatchingVerification(
 void DataAssociation::Process()
 {
     //step 1: feature extraction with SIFT
+    LOG(INFO) << "===== Feature Extraction =====\n\n";
     for (unsigned int i = 0; i < images_->getNumImgs(); i++) {
         std::vector<cv::KeyPoint> k;
         cv::Mat d;
@@ -144,6 +146,7 @@ void DataAssociation::Process()
     std::mutex db_mutex;
     std::mutex read_count_mutex;
     unsigned int read_count = 0;
+    LOG(INFO) << "===== Feature Matching =====\n\n";
     for (unsigned int i = 0; i < images_->getNumImgs(); i++) {
         for (unsigned int j = i + 1; j < images_->getNumImgs(); j++) {
             DataAssociation *da = this;

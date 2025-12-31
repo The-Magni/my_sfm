@@ -13,5 +13,5 @@ TARGET_LINK_LIBRARIES(reconstruction
 
 ADD_EXECUTABLE(test3 test.cc)
 TARGET_LINK_LIBRARIES(test3
-    PRIVATE reconstruction database Ceres::ceres
+    PRIVATE reconstruction database Ceres::ceres glog::glog
 )
