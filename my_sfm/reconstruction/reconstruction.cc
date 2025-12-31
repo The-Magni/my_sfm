@@ -7,6 +7,9 @@
 #include "opencv2/core/mat.hpp"
 #include "opencv2/core/matx.hpp"
 #include "opencv2/core/types.hpp"
+#include <opencv2/viz.hpp>
+#include "opencv2/viz/types.hpp"
+#include "opencv2/viz/widgets.hpp"
 #include "optimization.h"
 #include "point_cloud.h"
 #include "two_view_geometries.h"
@@ -159,6 +162,7 @@ bool Reconstruction::ImageRegistration()
     unsigned int next_img_id = findNextBestView(correspondences2d3d);
     if (next_img_id == INVALID_IMG_ID) // no more next best view
         return false;
+    LOG(INFO) << "Register image " << next_img_id << '\n';
     std::vector<cv::Point2d> img_points;
     std::vector<cv::Point3d> obj_points;
     std::unordered_set<unsigned int> seen; // store the 2d points index that already exist in 3d
@@ -198,10 +202,10 @@ bool Reconstruction::ImageRegistration()
         key_points_db_->Retrieve(img_id, registered_keypoints);
         true_correspondeces.clear(); // clear after every iteration
         if (next_img_id < img_id) { // due to two view geometries table format
-            two_view_db_->Retrieve(next_img_id, img_id, inlier_correspondences, F);
+            if(!two_view_db_->Retrieve(next_img_id, img_id, inlier_correspondences, F)) continue;
             true_correspondeces = inlier_correspondences;
         } else {
-            two_view_db_->Retrieve(img_id, next_img_id, inlier_correspondences, F);
+            if(!two_view_db_->Retrieve(img_id, next_img_id, inlier_correspondences, F)) continue;
             for (const Match &m : inlier_correspondences)
                 true_correspondeces.push_back(Match{m.idx2, m.idx1}); // reverse
         }
@@ -234,16 +238,21 @@ bool Reconstruction::ImageRegistration()
         }
     }
     optimize(pointcloud, cameras, key_points_db_, first_two_views[0], first_two_views[1]);
-    std::cout << cameras[first_two_views[0]].getIntrinsicMat() << '\n' << cameras[first_two_views[1]].getIntrinsicMat() << '\n' << cameras[next_img_id].getIntrinsicMat();
     registered_img_ids.insert(next_img_id);
     return true;
 }
 
 bool Reconstruction::IncrementalReconstruction()
 {
+    LOG(INFO) << "===== Incremental Reconstruction =====\n";
     while (registered_img_ids.size() < img_->getNumImgs()) {
         if(!ImageRegistration())
             return false; // cannot register all the images
     }
     return true;
+}
+
+PointCloud &Reconstruction::getPointCloud()
+{
+    return pointcloud;
 }

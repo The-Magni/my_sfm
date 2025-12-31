@@ -24,4 +24,5 @@ class Reconstruction {
         bool Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std::shared_ptr<Images> img, std::shared_ptr<KeyPointsDB> key_points_db);
         bool ImageRegistration();
         bool IncrementalReconstruction();
+        PointCloud &getPointCloud();
 };

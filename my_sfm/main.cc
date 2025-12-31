@@ -1,8 +1,10 @@
 #include "data_association.h"
 #include "keypoints.h"
 #include "descriptors.h"
+#include "point_cloud.h"
 #include "reconstruction.h"
 #include "two_view_geometries.h"
+#include "opencv2/viz/viz3d.hpp"
 #include <glog/logging.h>
 #include <memory>
 #include <opencv2/core/types.hpp>
@@ -21,6 +23,16 @@ int main(int argc, char *argv[])
     Reconstruction recon;
     recon.Init(db2, imgs, db);
     recon.IncrementalReconstruction();
+    const PointCloud &pointcloud = recon.getPointCloud();
+    cv::viz::Viz3d viz_window("Incremental Pointcloud");
+    viz_window.setBackgroundColor(cv::viz::Color::white());
+    viz_window.showWidget("coordinate", cv::viz::WCoordinateSystem(1.0));
+    cv::Mat cloud(pointcloud.points.size(), 1, CV_64FC3);
+    cv::Mat colors(pointcloud.points.size(), 1, CV_8UC3);
+    cv::viz::WCloud cloud_widget(cloud, colors);
+    viz_window.showWidget("Point Cloud", cloud_widget);
+    viz_window.spin();
+
     google::ShutdownGoogleLogging();
     return 0;
 }
