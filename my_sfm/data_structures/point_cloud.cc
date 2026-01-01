@@ -14,3 +14,13 @@ void PointCloud::addObservation(unsigned int idx, unsigned int img_id, unsigned 
     const Observation o(img_id, point_id);
     observation_to_point3d[o] = idx;
 }
+
+void PointCloud::rebuildMap()
+{
+    observation_to_point3d.clear();
+    for (unsigned int i = 0; i < points.size(); i++) {
+        for (const Observation &o : points[i].observations) {
+            observation_to_point3d[o] = i;
+        }
+    }
+}

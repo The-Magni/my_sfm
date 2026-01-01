@@ -1,6 +1,7 @@
 ADD_LIBRARY( reconstruction
     reconstruction.cc
     optimization.cc
+    outlier_filtering.cc
 )
 
 TARGET_INCLUDE_DIRECTORIES(reconstruction

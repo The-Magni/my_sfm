@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
     Reconstruction recon;
     recon.Init(db2, imgs, db);
     recon.IncrementalReconstruction();
+    recon.Write("/home/dinh/my_sfm/data/points3D.txt");
     const PointCloud &pointcloud = recon.getPointCloud();
     cv::viz::Viz3d viz_window("Incremental Pointcloud");
     viz_window.setBackgroundColor(cv::viz::Color::white());

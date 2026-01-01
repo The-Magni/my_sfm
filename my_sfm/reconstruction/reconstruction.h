@@ -6,6 +6,7 @@
 #include "two_view_geometries.h"
 #include "point_cloud.h"
 #include <memory>
+#include <string>
 #include <vector>
 
 class Reconstruction {
@@ -25,4 +26,5 @@ class Reconstruction {
         bool ImageRegistration();
         bool IncrementalReconstruction();
         PointCloud &getPointCloud();
+        bool Write(const std::string &filepath);
 };

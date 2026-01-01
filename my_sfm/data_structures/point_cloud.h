@@ -3,6 +3,7 @@
 #include "opencv2/core/matx.hpp"
 #include <cstddef>
 #include <functional>
+#include <pstl/glue_algorithm_defs.h>
 #include <unordered_map>
 #include <vector>
 
@@ -59,4 +60,6 @@ struct PointCloud {
     void addPoint(const Point &point);
 
     void addObservation(unsigned int idx, unsigned int img_id, unsigned int point_id);
+
+    void rebuildMap();
 };

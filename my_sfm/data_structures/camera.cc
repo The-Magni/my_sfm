@@ -21,7 +21,7 @@ Camera::Camera(unsigned int img_width, unsigned int img_height)
     trans = {0, 0, 0};
 }
 
-cv::Vec2d Camera::project(cv::Vec3d point3D)
+cv::Vec2d Camera::project(cv::Vec3d point3D) const
 {
     cv::Vec2d point2D;
     cv::Matx33d R;
@@ -55,7 +55,7 @@ double *Camera::getTranslationParams()
     return trans.data();
 }
 
-cv::Matx34d Camera::getProjectionMat()
+cv::Matx34d Camera::getProjectionMat() const
 {
     cv::Matx34d P, Rt = getExtrinsicMat();
     cv::Matx33d K = getIntrinsicMat();
@@ -63,7 +63,7 @@ cv::Matx34d Camera::getProjectionMat()
     return P;
 }
 
-cv::Matx34d Camera::getExtrinsicMat()
+cv::Matx34d Camera::getExtrinsicMat() const
 {
     cv::Matx34d Rt;
     cv::Matx33d R;
@@ -74,7 +74,7 @@ cv::Matx34d Camera::getExtrinsicMat()
     return Rt;
 }
 
-cv::Matx33d Camera::getIntrinsicMat()
+cv::Matx33d Camera::getIntrinsicMat() const
 {
     cv::Matx33d K = cv::Matx33d::eye();
     K(0, 0) = intrinsic[0];
@@ -84,7 +84,7 @@ cv::Matx33d Camera::getIntrinsicMat()
     return K;
 }
 
-cv::Vec4d Camera::getDistCoeff()
+cv::Vec4d Camera::getDistCoeff() const
 {
     return cv::Vec4d(intrinsic[3], 0.0, 0.0, 0.0);
 }
@@ -95,4 +95,13 @@ void Camera::updatePose(const cv::Matx33d &R, const cv::Vec3d &t)
     q = {quat.w, quat.x, quat.y, quat.z};
 
     trans = {t[0], t[1], t[2]};
+}
+
+void Camera::getPose(cv::Matx33d &R, cv::Vec3d &t) const
+{
+    cv::Quatd quat(q[0], q[1], q[2], q[3]);
+    cv::Vec3d t_w2c(trans[0], trans[1], trans[2]);
+    cv::Matx33d R_w2c = quat.toRotMat3x3();
+    R = R_w2c.t();
+    t = -R_w2c.t() * t_w2c;
 }

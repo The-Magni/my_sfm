@@ -7,9 +7,9 @@
 #include "opencv2/core/mat.hpp"
 #include "opencv2/core/matx.hpp"
 #include "opencv2/core/types.hpp"
+#include <fstream>
+#include <ios>
 #include <opencv2/viz.hpp>
-#include "opencv2/viz/types.hpp"
-#include "opencv2/viz/widgets.hpp"
 #include "optimization.h"
 #include "point_cloud.h"
 #include "two_view_geometries.h"
@@ -255,4 +255,17 @@ bool Reconstruction::IncrementalReconstruction()
 PointCloud &Reconstruction::getPointCloud()
 {
     return pointcloud;
+}
+
+bool Reconstruction::Write(const std::string &filepath)
+{
+    std::ofstream file;
+    file.open(filepath, std::ios::out | std::ios::trunc);
+    if (!file.is_open()) return false;
+    for (const Point &point : pointcloud.points){
+        file << point.pt[0] << " " << point.pt[1] << " " << point.pt[2]
+        << " " << static_cast<unsigned int>(point.color[0]) << " " << static_cast<unsigned int>(point.color[1]) << " " << static_cast<unsigned int>(point.color[2]) << '\n';
+    }
+    file.close();
+    return true;
 }
