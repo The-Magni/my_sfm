@@ -15,11 +15,11 @@ int main()
     // da.Init(imgs, db, db1, db2);
     // da.Process();
 
-    unsigned int i, j;
+    unsigned int i = 8, j = 10;
     std::vector<Match> inlier_correspondences;
     cv::Mat F;
-    db2->RetrieveBestTwoView(i, j, inlier_correspondences, F);
-
+    // db2->RetrieveBestTwoView(i, j, inlier_correspondences, F);
+    db2->Retrieve(i, j, inlier_correspondences, F);
     std::vector<cv::KeyPoint> keypoints1;
     db->Retrieve(i, keypoints1);
     std::vector<cv::KeyPoint> keypoints2;
@@ -31,7 +31,7 @@ int main()
         cv::Point2f point2 = keypoints2[match.idx2].pt;
         cv::Matx31d point1_homo(point1.x, point1.y, 1);
         cv::Matx13d point2_homo(point2.x, point2.y, 1);
-        std::cout << point2_homo * F * point1_homo << '\n';
+        // std::cout << point2_homo * F * point1_homo << '\n';
     }
     cv::Mat img_matches;
     cv::drawMatches( imgs->loadImages(i), keypoints1, imgs->loadImages(j), keypoints2, matches, img_matches, cv::Scalar::all(-1),

@@ -3,6 +3,7 @@
 #include "camera.h"
 #include "images.h"
 #include "keypoints.h"
+#include "outlier_filtering.h"
 #include "two_view_geometries.h"
 #include "point_cloud.h"
 #include <memory>
@@ -14,6 +15,7 @@ class Reconstruction {
         std::shared_ptr<TwoViewGeometriesDB> two_view_db_{nullptr};
         std::shared_ptr<Images> img_{nullptr};
         std::shared_ptr<KeyPointsDB> key_points_db_{nullptr};
+        std::shared_ptr<OutlierFiltering> outlier_filtering_{nullptr};
         std::vector<Camera> cameras;
         PointCloud pointcloud;
         std::set<unsigned int> registered_img_ids;
@@ -23,8 +25,10 @@ class Reconstruction {
 
     public:
         bool Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std::shared_ptr<Images> img, std::shared_ptr<KeyPointsDB> key_points_db);
+
         bool ImageRegistration();
+
         bool IncrementalReconstruction();
-        PointCloud &getPointCloud();
+
         bool Write(const std::string &filepath);
 };

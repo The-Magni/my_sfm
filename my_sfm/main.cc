@@ -4,7 +4,7 @@
 #include "point_cloud.h"
 #include "reconstruction.h"
 #include "two_view_geometries.h"
-#include "opencv2/viz/viz3d.hpp"
+#include "visualization/visualization.h"
 #include <glog/logging.h>
 #include <memory>
 #include <opencv2/core/types.hpp>
@@ -23,16 +23,11 @@ int main(int argc, char *argv[])
     Reconstruction recon;
     recon.Init(db2, imgs, db);
     recon.IncrementalReconstruction();
-    recon.Write("/home/dinh/my_sfm/data/points3D.txt");
-    const PointCloud &pointcloud = recon.getPointCloud();
-    cv::viz::Viz3d viz_window("Incremental Pointcloud");
-    viz_window.setBackgroundColor(cv::viz::Color::white());
-    viz_window.showWidget("coordinate", cv::viz::WCoordinateSystem(1.0));
-    cv::Mat cloud(pointcloud.points.size(), 1, CV_64FC3);
-    cv::Mat colors(pointcloud.points.size(), 1, CV_8UC3);
-    cv::viz::WCloud cloud_widget(cloud, colors);
-    viz_window.showWidget("Point Cloud", cloud_widget);
-    viz_window.spin();
+    recon.Write("/home/dinh/my_sfm/data");
+
+    const std::string dir_path = "/home/dinh/my_sfm/data";
+    Visualization viz(dir_path);
+    viz.Process();
 
     google::ShutdownGoogleLogging();
     return 0;

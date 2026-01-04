@@ -3,6 +3,7 @@
 #include "opencv2/core/matx.hpp"
 #include "opencv2/core/types.hpp"
 #include "point_cloud.h"
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <unordered_map>
@@ -10,8 +11,8 @@
 
 OutlierFiltering::OutlierFiltering(
     std::shared_ptr<KeyPointsDB> keypoints_db,
-    unsigned int max_filter_reproj_error,
-    unsigned int min_filter_tri_angle
+    double max_filter_reproj_error,
+    double min_filter_tri_angle
 ) {
     keypoints_db_ = keypoints_db;
     max_filter_reproj_error_ = max_filter_reproj_error;
@@ -37,8 +38,8 @@ void OutlierFiltering::FilterObservationByReprojectionError(PointCloud &pointclo
             else
                 j++;
         }
-        // remove the point if it has 0 observation
-        if (p.observations.size() == 0)
+        // remove the point if it has 0 or 1 observation (underconstraint)
+        if (p.observations.size() <= 1)
             i = pointcloud.points.erase(i);
         else
             i++;
@@ -67,7 +68,7 @@ void OutlierFiltering::FilterPointsByTriAngle(PointCloud &pointcloud, const std:
                 if (norm1 < 1e-9 || norm2 < 1e-9)
                     cos_theta = 1; // mean that theta = 0, will be filtered
                 else
-                    cos_theta = v1.dot(v2) / (norm1 * norm2);
+                    cos_theta = std::clamp(v1.dot(v2) / (norm1 * norm2), -1.0, 1.0);
                 if (std::acos(cos_theta) * 180.0 / M_PI <= min_filter_tri_angle_) {
                     is_filtered = true;
                     break;
@@ -84,8 +85,36 @@ void OutlierFiltering::FilterPointsByTriAngle(PointCloud &pointcloud, const std:
     }
 }
 
+void OutlierFiltering::FilteringPointsBehindCam(PointCloud &pointcloud, const std::vector<Camera> &cameras)
+{
+    for (auto i = pointcloud.points.begin(); i != pointcloud.points.end(); ) {
+        Point &p = *i;
+        for (auto j = p.observations.begin(); j != p.observations.end(); ) {
+            const Observation &o = *j;
+            cv::Matx34d Rt = cameras[o.img_id].getExtrinsicMat();
+            cv::Matx33d R(
+                Rt(0, 0), Rt(0, 1), Rt(0, 2),
+                Rt(1, 0), Rt(1, 1), Rt(1, 2),
+                Rt(2, 0), Rt(2, 1), Rt(2, 2)
+            );
+            cv::Vec3d t(Rt(0, 3), Rt(1, 3), Rt(2, 3));
+            cv::Vec3d point3D_cam = R * p.pt + t;
+            if (point3D_cam[2] <= 0)
+                j = p.observations.erase(j);
+            else
+                j++;
+        }
+        if (p.observations.size() <= 1)
+            i = pointcloud.points.erase(i);
+        else
+            i++;
+    }
+}
+
+
 void OutlierFiltering::Process(PointCloud &pointcloud, const std::vector<Camera> &cameras)
 {
     FilterObservationByReprojectionError(pointcloud, cameras);
+    FilteringPointsBehindCam(pointcloud, cameras);
     FilterPointsByTriAngle(pointcloud, cameras);
 }

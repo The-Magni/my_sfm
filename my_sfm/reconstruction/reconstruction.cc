@@ -1,4 +1,5 @@
 #include "reconstruction.h"
+#include "camera.h"
 #include "images.h"
 #include "keypoints.h"
 #include "opencv2/calib3d.hpp"
@@ -11,6 +12,7 @@
 #include <ios>
 #include <opencv2/viz.hpp>
 #include "optimization.h"
+#include "outlier_filtering.h"
 #include "point_cloud.h"
 #include "two_view_geometries.h"
 #include <algorithm>
@@ -74,6 +76,7 @@ bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std:
     two_view_db_ = two_view_db;
     img_ = img;
     key_points_db_ = key_points_db;
+    outlier_filtering_ = std::make_shared<OutlierFiltering>(key_points_db_, 4.0, 1.5);
     // initialize camera parameters to default value
     cameras.reserve(img_->getNumImgs());
     cv::Mat sample;
@@ -149,6 +152,8 @@ bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std:
     }
     // lets go bundle adjustment
     optimize(pointcloud, cameras, key_points_db_, img1_id, img2_id);
+    outlier_filtering_->Process(pointcloud, cameras);
+    pointcloud.rebuildMap();
     registered_img_ids.insert(img1_id);
     registered_img_ids.insert(img2_id);
     first_two_views[0] = img1_id;
@@ -181,7 +186,7 @@ bool Reconstruction::ImageRegistration()
     CV_Assert(obj_points.size() == img_points.size());
     CV_Assert(obj_points.size() == correspondences2d3d.size());
     // solving pnp problems
-    cv::solvePnPRansac(
+    bool success = cv::solvePnPRansac(
         obj_points,
         img_points,
         cameras[next_img_id].getIntrinsicMat(),
@@ -189,6 +194,14 @@ bool Reconstruction::ImageRegistration()
         rvec, tvec,
         false, 100, 10.0, 0.99, cv::noArray(),
         cv::SOLVEPNP_EPNP);
+    if (!success) {
+        LOG(WARNING) << "Fail to solve PnP for image " << next_img_id << '\n';
+        cv::solvePnPRefineLM(
+            obj_points, img_points,
+            cameras[next_img_id].getIntrinsicMat(), cameras[next_img_id].getDistCoeff(),
+            rvec, tvec
+        );
+    }
     cv::Rodrigues(rvec, R);
     cameras[next_img_id].updatePose(R, tvec);
 
@@ -248,24 +261,37 @@ bool Reconstruction::IncrementalReconstruction()
     while (registered_img_ids.size() < img_->getNumImgs()) {
         if(!ImageRegistration())
             return false; // cannot register all the images
+        outlier_filtering_->Process(pointcloud, cameras);
+        pointcloud.rebuildMap(); // lol
     }
+    // last global bundle adjustment
+    optimize(pointcloud, cameras, key_points_db_, first_two_views[0], first_two_views[1]);
     return true;
 }
 
-PointCloud &Reconstruction::getPointCloud()
+bool Reconstruction::Write(const std::string &dir_path)
 {
-    return pointcloud;
-}
+    std::ofstream points3D_file, cameras_file;
+    double *q, *t, *intrinsics;
 
-bool Reconstruction::Write(const std::string &filepath)
-{
-    std::ofstream file;
-    file.open(filepath, std::ios::out | std::ios::trunc);
-    if (!file.is_open()) return false;
-    for (const Point &point : pointcloud.points){
-        file << point.pt[0] << " " << point.pt[1] << " " << point.pt[2]
+    points3D_file.open(dir_path + "/points3D.txt", std::ios::out | std::ios::trunc);
+    if (!points3D_file.is_open()) return false;
+    for (const Point &point : pointcloud.points) {
+        points3D_file << point.pt[0] << " " << point.pt[1] << " " << point.pt[2]
         << " " << static_cast<unsigned int>(point.color[0]) << " " << static_cast<unsigned int>(point.color[1]) << " " << static_cast<unsigned int>(point.color[2]) << '\n';
     }
-    file.close();
+    points3D_file.close();
+
+    cameras_file.open(dir_path + "/cameras.txt", std::ios::out | std::ios::trunc);
+    if (!cameras_file.is_open()) return false;
+    for (Camera &camera : cameras) {
+        q = camera.getQuartenionParams();
+        t = camera.getTranslationParams();
+        intrinsics = camera.getIntrinsicParams();
+        cameras_file << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << " "
+        << t[0] << " " << t[1] << " " << t[2] << " "
+        << intrinsics[0] << " " << intrinsics[1] << " " << intrinsics[2] << " " << intrinsics[3] << '\n';
+    }
+    cameras_file.close();
     return true;
 }
