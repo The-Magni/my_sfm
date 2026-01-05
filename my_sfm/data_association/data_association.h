@@ -11,7 +11,7 @@
 #include <vector>
 
 #define MIN_NUM_INLIERS 15
-#define MIN_INLIER_RATIO 0.5
+#define MIN_INLIER_RATIO 0.25
 #define MAX_H_INLIER_RATIO 0.8
 
 class DataAssociation {
