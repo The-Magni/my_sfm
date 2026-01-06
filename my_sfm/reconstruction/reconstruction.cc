@@ -8,8 +8,10 @@
 #include "opencv2/core/mat.hpp"
 #include "opencv2/core/matx.hpp"
 #include "opencv2/core/types.hpp"
+#include <cassert>
 #include <fstream>
 #include <ios>
+#include <iterator>
 #include <opencv2/viz.hpp>
 #include "optimization.h"
 #include "outlier_filtering.h"
@@ -71,12 +73,47 @@ unsigned int Reconstruction::findNextBestView(std::vector<Match> &correspondence
     return chosen_img_id;
 }
 
+std::vector<Point> Reconstruction::Triangulation(
+    unsigned int img1_id,
+    unsigned int img2_id,
+    const std::vector<cv::Point2f> &points1,
+    const std::vector<cv::Point2f> &points2,
+    const cv::Mat &img1,
+    const cv::Mat &img2
+) {
+    std::vector<Point> result;
+    std::vector<cv::Point2f> points1_undistorted, points2_undistorted;
+    cv::Mat points4D, points3D;
+    unsigned int N;
+    cv::Matx33d K1 = cameras[img1_id].getIntrinsicMat();
+    cv::Matx33d K2 = cameras[img2_id].getIntrinsicMat();
+    cv::Vec4d distCoeffs1 = cameras[img1_id].getDistCoeff();
+    cv::Vec4d distCoeffs2 = cameras[img2_id].getDistCoeff();
+    // undistort points already return pixels in normalized space so take Rt as P
+    cv::undistortPoints(points1, points1_undistorted, K1, distCoeffs1);
+    cv::undistortPoints(points2, points2_undistorted, K2, distCoeffs2);
+    cv::triangulatePoints(
+        cameras[img1_id].getExtrinsicMat(), cameras[img2_id].getExtrinsicMat(), points1_undistorted, points2_undistorted, points4D
+    );
+    cv::convertPointsFromHomogeneous(points4D.t(), points3D);
+    N = points1.size();
+    for (unsigned int i = 0; i < N; i++) {
+        cv::Vec3b color1 = img1.at<cv::Vec3b>((int) std::round(points1[i].y), (int) std::round(points1[i].x));
+        cv::Vec3b color2 = img2.at<cv::Vec3b>((int) std::round(points2[i].y), (int) std::round(points2[i].x));
+        cv::Vec3b color = (color1 + color2) / 2;
+        cv::Vec3f xyz = points3D.at<cv::Vec3f>(i, 0);
+        cv::Vec3d p(xyz[0], xyz[1], xyz[2]);
+        result.emplace_back(p, color);
+    }
+    return result;
+}
+
 bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std::shared_ptr<Images> img, std::shared_ptr<KeyPointsDB> key_points_db)
 {
     two_view_db_ = two_view_db;
     img_ = img;
     key_points_db_ = key_points_db;
-    outlier_filtering_ = std::make_shared<OutlierFiltering>(key_points_db_, 4.0, 1.5);
+    outlier_filtering_ = std::make_shared<OutlierFiltering>(key_points_db_, 8.0, 1.5);
     // initialize camera parameters to default value
     cameras.reserve(img_->getNumImgs());
     cv::Mat sample;
@@ -87,9 +124,7 @@ bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std:
 
 
     std::vector<cv::KeyPoint> keypoints1, keypoints2;
-    std::vector<cv::Point2f> points1, points2,
-    points1_filtered, points2_filtered,
-    points1_undistorted, points2_undistorted;
+    std::vector<cv::Point2f> points1, points2, points1_filtered, points2_filtered;
     // choose initial 2 non-panoramic views and get E
     unsigned int img1_id, img2_id;
     std::vector<Match> inlier_correspondences, inlier_correspondences_filtered;
@@ -112,7 +147,7 @@ bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std:
     // lets go triangulation
     cv::Matx33d R;
     cv::Vec3d t;
-    cv::Mat points3D, points4D, img1, img2, inlier_mask;
+    cv::Mat inlier_mask, img1, img2;
     unsigned int N = inlier_correspondences.size();
     cv::recoverPose(
         points1, points2, K1, distCoeffs1, K2, distCoeffs2, E, R, t,
@@ -124,36 +159,23 @@ bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std:
             points1_filtered.push_back(points1[i]);
             points2_filtered.push_back(points2[i]);
             inlier_correspondences_filtered.push_back(inlier_correspondences[i]);
-           N_filtered++;
+            N_filtered++;
         }
     }
     cameras[img1_id].updatePose(cv::Matx33d::eye(), cv::Vec3d::zeros());
     cameras[img2_id].updatePose(R, t); // this is world-to-cam matrix
-    // undistort points already return pixels in normalized space so take Rt as P
-    cv::undistortPoints(points1_filtered, points1_undistorted, K1, distCoeffs1);
-    cv::undistortPoints(points2_filtered, points2_undistorted, K2, distCoeffs2);
-    cv::triangulatePoints(
-        cameras[img1_id].getExtrinsicMat(), cameras[img2_id].getExtrinsicMat(), points1_undistorted, points2_undistorted, points4D
-    );
-    cv::convertPointsFromHomogeneous(points4D.t(), points3D);
-    // add them to the point cloud
+
     img1 = img_->loadImages(img1_id);
     img2 = img_->loadImages(img2_id);
+    std::vector<Point> triangulated_points = Triangulation(img1_id, img2_id, points1_filtered, points2_filtered, img1, img2);
+    assert(triangulated_points.size() == N_filtered);
     for (unsigned int i = 0; i < N_filtered; i++) {
-        cv::Vec3b color1 = img1.at<cv::Vec3b>((int) std::round(points1_filtered[i].y), (int) std::round(points1_filtered[i].x));
-        cv::Vec3b color2 = img2.at<cv::Vec3b>((int) std::round(points2_filtered[i].y), (int) std::round(points2_filtered[i].x));
-        cv::Vec3b color = (color1 + color2) / 2;
-        cv::Vec3f xyz = points3D.at<cv::Vec3f>(i, 0);
-        cv::Vec3d p(xyz[0], xyz[1], xyz[2]);
-        Point point(p, color);
-        point.addObservation(img1_id, inlier_correspondences_filtered[i].idx1);
-        point.addObservation(img2_id, inlier_correspondences_filtered[i].idx2);
-        pointcloud.addPoint(point);
+        triangulated_points[i].addObservation(img1_id, inlier_correspondences_filtered[i].idx1);
+        triangulated_points[i].addObservation(img2_id, inlier_correspondences_filtered[i].idx2);
+        pointcloud.addPoint(triangulated_points[i]);
     }
     // lets go bundle adjustment
     optimize(pointcloud, cameras, key_points_db_, img1_id, img2_id);
-    outlier_filtering_->Process(pointcloud, cameras);
-    pointcloud.rebuildMap();
     registered_img_ids.insert(img1_id);
     registered_img_ids.insert(img2_id);
     first_two_views[0] = img1_id;
@@ -185,6 +207,7 @@ bool Reconstruction::ImageRegistration()
     }
     CV_Assert(obj_points.size() == img_points.size());
     CV_Assert(obj_points.size() == correspondences2d3d.size());
+    CV_Assert(obj_points.size() >= 8);
     // solving pnp problems
     bool success = cv::solvePnPRansac(
         obj_points,
@@ -206,14 +229,15 @@ bool Reconstruction::ImageRegistration()
     cameras[next_img_id].updatePose(R, tvec);
 
     // triangulate new 3d points with previously registered views
-    std::vector<Match> inlier_correspondences, true_correspondeces;
+    std::vector<Match> inlier_correspondences, true_correspondeces, true_correspondences_filtered;
     cv::Mat F, points3D, points4D, img1, img2;
 
 
     for (const unsigned int &img_id : registered_img_ids) {
-        std::vector<cv::Point2f> points1, points2, points1_undistorted, points2_undistorted;
+        std::vector<cv::Point2f> points1, points2;
         key_points_db_->Retrieve(img_id, registered_keypoints);
         true_correspondeces.clear(); // clear after every iteration
+        true_correspondences_filtered.clear();
         if (next_img_id < img_id) { // due to two view geometries table format
             if(!two_view_db_->Retrieve(next_img_id, img_id, inlier_correspondences, F)) continue;
             true_correspondeces = inlier_correspondences;
@@ -226,28 +250,21 @@ bool Reconstruction::ImageRegistration()
         for (const Match &m : true_correspondeces) {
             if (seen.count(m.idx1) > 0)
                 continue;
+            true_correspondences_filtered.push_back(m);
             points1.push_back(chosen_keypoints[m.idx1].pt);
             points2.push_back(registered_keypoints[m.idx2].pt);
         }
+        assert(points1.size() == points2.size());
+        if (points1.size() == 0) continue; // no new points to triangualute
 
-        cv::undistortPoints(points1, points1_undistorted, cameras[next_img_id].getIntrinsicMat(), cameras[next_img_id].getDistCoeff());
-        cv::undistortPoints(points2, points2_undistorted, cameras[img_id].getIntrinsicMat(), cameras[img_id].getDistCoeff());
-        cv::triangulatePoints(
-            cameras[next_img_id].getExtrinsicMat(), cameras[img_id].getExtrinsicMat(), points1_undistorted, points2_undistorted, points4D
-        );
-        cv::convertPointsFromHomogeneous(points4D.t(), points3D);
         img1 = img_->loadImages(next_img_id);
         img2 = img_->loadImages(img_id);
-        for (int i = 0; i < points3D.rows; i++) {
-            cv::Vec3b color1 = img1.at<cv::Vec3b>((int) std::round(points1[i].y), (int) std::round(points1[i].x));
-            cv::Vec3b color2 = img2.at<cv::Vec3b>((int) std::round(points2[i].y), (int) std::round(points2[i].x));
-            cv::Vec3b color = (color1 + color2) / 2;
-            cv::Vec3f xyz = points3D.at<cv::Vec3f>(i, 0);
-            cv::Vec3d p(xyz[0], xyz[1], xyz[2]);
-            Point point(p, color);
-            point.addObservation(next_img_id, true_correspondeces[i].idx1);
-            point.addObservation(img_id, true_correspondeces[i].idx2);
-            pointcloud.addPoint(point);
+        std::vector<Point> triangulated_points = Triangulation(next_img_id, img_id, points1, points2, img1, img2);
+        assert(triangulated_points.size() == true_correspondences_filtered.size());
+        for (unsigned int i = 0; i < true_correspondences_filtered.size(); i++) {
+            triangulated_points[i].addObservation(next_img_id, true_correspondences_filtered[i].idx1);
+            triangulated_points[i].addObservation(img_id, true_correspondences_filtered[i].idx2);
+            pointcloud.addPoint(triangulated_points[i]);
         }
     }
     optimize(pointcloud, cameras, key_points_db_, first_two_views[0], first_two_views[1]);
@@ -262,10 +279,12 @@ bool Reconstruction::IncrementalReconstruction()
         if(!ImageRegistration())
             return false; // cannot register all the images
         outlier_filtering_->Process(pointcloud, cameras);
-        pointcloud.rebuildMap(); // lol
+        pointcloud.rebuildMap();
+        ReTriangulation();
     }
     // last global bundle adjustment
     optimize(pointcloud, cameras, key_points_db_, first_two_views[0], first_two_views[1]);
+    outlier_filtering_->Process(pointcloud, cameras);
     return true;
 }
 
@@ -294,4 +313,40 @@ bool Reconstruction::Write(const std::string &dir_path)
     }
     cameras_file.close();
     return true;
+}
+
+void Reconstruction::ReTriangulation()
+{
+    std::vector<Match> inlier_correspondences;
+    cv::Mat F;
+    std::unordered_map<unsigned int, std::vector<cv::KeyPoint>> cache;
+    std::vector<cv::Point2f> points1, points2;
+    cv::Mat point4D, point3D;
+    std::unordered_map<unsigned int, cv::Mat> registered_imgs;
+    registered_imgs.reserve(registered_img_ids.size());
+    for (const unsigned int idx : registered_img_ids) {
+        registered_imgs[idx] = img_->loadImages(idx);
+    }
+
+    cache.reserve(registered_img_ids.size());
+    for (auto img1_it = registered_img_ids.begin(); img1_it != registered_img_ids.end(); img1_it++) {
+        for (auto img2_it = std::next(img1_it); img2_it != registered_img_ids.end(); img2_it++) {
+            points1.clear();
+            points2.clear();
+            if (!two_view_db_->Retrieve(*img1_it, *img2_it, inlier_correspondences, F)) continue;
+            for (const Match &m : inlier_correspondences) {
+                if (pointcloud.hasObservation(*img1_it, m.idx1) || pointcloud.hasObservation(*img2_it, m.idx2))
+                    continue;
+
+                if (!cache.count(*img1_it)) key_points_db_->Retrieve(*img1_it, cache[*img1_it]);
+                if (!cache.count(*img2_it)) key_points_db_->Retrieve(*img2_it, cache[*img2_it]);
+                points1.push_back(cache[*img1_it].at(m.idx1).pt);
+                points2.push_back(cache[*img2_it].at(m.idx2).pt);
+                Point point = Triangulation(*img1_it, *img2_it, points1, points2, registered_imgs[*img1_it], registered_imgs[*img2_it]).at(0);
+                point.addObservation(*img1_it, m.idx1);
+                point.addObservation(*img2_it, m.idx2);
+                pointcloud.addPoint(point);
+            }
+        }
+    }
 }

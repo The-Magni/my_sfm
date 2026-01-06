@@ -62,4 +62,6 @@ struct PointCloud {
     void addObservation(unsigned int idx, unsigned int img_id, unsigned int point_id);
 
     void rebuildMap();
+
+    bool hasObservation(unsigned int img_id, unsigned int point_id) const;
 };

@@ -24,3 +24,9 @@ void PointCloud::rebuildMap()
         }
     }
 }
+
+bool PointCloud::hasObservation(unsigned int img_id, unsigned int point_id) const
+{
+    const Observation o(img_id, point_id);
+    return observation_to_point3d.count(o) > 0;
+}

@@ -27,7 +27,7 @@ bool DataAssociation::Init(
 
 void DataAssociation::featureExtraction(unsigned int image_id, std::vector<cv::KeyPoint> &keypoints, cv::Mat &descriptors)
 {
-    LOG(INFO) << "Extracting feautures from image " << image_id << '\n';
+    LOG(INFO) << "Extracting features from image " << image_id << '\n';
     cv::Mat img = images_->loadImages(image_id);
     cv::Mat gray;
     cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);

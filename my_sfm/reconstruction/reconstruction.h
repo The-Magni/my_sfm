@@ -7,6 +7,8 @@
 #include "two_view_geometries.h"
 #include "point_cloud.h"
 #include <memory>
+#include <opencv2/core/mat.hpp>
+#include <opencv2/core/types.hpp>
 #include <string>
 #include <vector>
 
@@ -31,4 +33,17 @@ class Reconstruction {
         bool IncrementalReconstruction();
 
         bool Write(const std::string &filepath);
+
+        void ReTriangulation();
+
+        std::vector<Point> Triangulation(
+            unsigned int img1_id,
+            unsigned int img2_id,
+            const std::vector<cv::Point2f> &points1,
+            const std::vector<cv::Point2f> &points2,
+            const cv::Mat &img1,
+            const cv::Mat &img2
+        );
+
+        void TrackExtension();
 };
