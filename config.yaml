@@ -1,6 +1,6 @@
-data_path: /home/dinh/my_sfm/data
-database_path: /home/dinh/my_sfm/data/database.db
-images_path: /home/dinh/my_sfm/data/images
+data_path: /home/dinh/my_sfm/test_data
+database_path: /home/dinh/my_sfm/test_data/database.db
+images_path: /home/dinh/my_sfm/test_data/test_images
 
 outlier_filtering:
   max_reproj_error: 8.0
