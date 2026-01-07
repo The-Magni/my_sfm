@@ -108,12 +108,16 @@ std::vector<Point> Reconstruction::Triangulation(
     return result;
 }
 
-bool Reconstruction::Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std::shared_ptr<Images> img, std::shared_ptr<KeyPointsDB> key_points_db)
-{
+bool Reconstruction::Init(
+    std::shared_ptr<TwoViewGeometriesDB> two_view_db,
+    std::shared_ptr<Images> img,
+    std::shared_ptr<KeyPointsDB> key_points_db,
+    std::shared_ptr<OutlierFiltering> outlier_filtering
+) {
     two_view_db_ = two_view_db;
     img_ = img;
     key_points_db_ = key_points_db;
-    outlier_filtering_ = std::make_shared<OutlierFiltering>(key_points_db_, 8.0, 1.5);
+    outlier_filtering_ = outlier_filtering;
     // initialize camera parameters to default value
     cameras.reserve(img_->getNumImgs());
     cv::Mat sample;

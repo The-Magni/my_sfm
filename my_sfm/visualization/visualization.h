@@ -15,7 +15,7 @@ class Visualization {
         bool readCameras(std::vector<cv::Affine3d> &poses, std::vector<cv::Matx33d> &Ks);
 
     public:
-        Visualization(const std::string &dir_path);
+        void Init(const std::string &dir_path);
 
         void Process();
 };

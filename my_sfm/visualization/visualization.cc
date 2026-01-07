@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-Visualization::Visualization(const std::string &dir_path)
+void Visualization::Init(const std::string &dir_path)
 {
     points3D_path = dir_path + "/points3D.txt";
     cameras_path = dir_path + "/cameras.txt";
@@ -70,7 +70,7 @@ void Visualization::Process()
     }
     cv::viz::Viz3d viz_window("Point Cloud and Cameras");
     cv::viz::WCloud cloud_widget(cloud, colors);
-    viz_window.setBackgroundColor(cv::viz::Color::white());
+    viz_window.setBackgroundColor(cv::viz::Color::black());
     viz_window.showWidget("Coordinate", cv::viz::WCoordinateSystem(1.0));
     viz_window.showWidget("Point Cloud", cloud_widget);
 

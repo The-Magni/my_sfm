@@ -26,7 +26,12 @@ class Reconstruction {
         unsigned int findNextBestView(std::vector<Match> &correspondences2d3d);
 
     public:
-        bool Init(std::shared_ptr<TwoViewGeometriesDB> two_view_db, std::shared_ptr<Images> img, std::shared_ptr<KeyPointsDB> key_points_db);
+        bool Init(
+            std::shared_ptr<TwoViewGeometriesDB> two_view_db,
+            std::shared_ptr<Images> img,
+            std::shared_ptr<KeyPointsDB> key_points_db,
+            std::shared_ptr<OutlierFiltering> outlier_filtering
+        );
 
         bool ImageRegistration();
 
