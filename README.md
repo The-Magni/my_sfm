@@ -72,7 +72,7 @@ sudo apt-get install sqlite3 libsqlite3-dev
 sudo apt install libyaml-cpp-dev
 ```
 
-### Ceres: Non-linear Optimization and Bundle Adjustment
+### Ceres Solver 2.2: Non-linear Optimization and Bundle Adjustment
 Download latest stable release from [link](http://ceres-solver.org/installation.html)
 ```bash
 # google-glog + gflags
