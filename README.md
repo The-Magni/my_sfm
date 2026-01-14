@@ -73,7 +73,7 @@ sudo apt install libyaml-cpp-dev
 ```
 
 ### Ceres Solver 2.2: Non-linear Optimization and Bundle Adjustment
-Download latest stable release from [link](http://ceres-solver.org/installation.html)
+Download latest stable release from [link](https://github.com/ceres-solver/ceres-solver/tags)
 ```bash
 # google-glog + gflags
 sudo apt-get install libgoogle-glog-dev libgflags-dev
