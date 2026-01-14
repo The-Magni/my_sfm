@@ -9,6 +9,7 @@
 #include <memory>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,7 @@ class Reconstruction {
         std::vector<Camera> cameras;
         PointCloud pointcloud;
         std::set<unsigned int> registered_img_ids;
+        std::set<unsigned int> degenerated_img_ids;
         std::array<unsigned int, 2> first_two_views;
 
         unsigned int findNextBestView(std::vector<Match> &correspondences2d3d);

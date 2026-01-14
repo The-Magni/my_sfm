@@ -223,11 +223,13 @@ bool Reconstruction::ImageRegistration()
         cv::SOLVEPNP_EPNP);
     if (!success) {
         LOG(WARNING) << "Fail to solve PnP for image " << next_img_id << '\n';
-        cv::solvePnPRefineLM(
-            obj_points, img_points,
-            cameras[next_img_id].getIntrinsicMat(), cameras[next_img_id].getDistCoeff(),
-            rvec, tvec
-        );
+        // cv::solvePnPRefineLM(
+        //     obj_points, img_points,
+        //     cameras[next_img_id].getIntrinsicMat(), cameras[next_img_id].getDistCoeff(),
+        //     rvec, tvec
+        // );
+        degenerated_img_ids.insert(next_img_id);
+        return true;
     }
     cv::Rodrigues(rvec, R);
     cameras[next_img_id].updatePose(R, tvec);
@@ -279,7 +281,7 @@ bool Reconstruction::ImageRegistration()
 bool Reconstruction::IncrementalReconstruction()
 {
     LOG(INFO) << "===== Incremental Reconstruction =====\n";
-    while (registered_img_ids.size() < img_->getNumImgs()) {
+    while (registered_img_ids.size() + degenerated_img_ids.size() < img_->getNumImgs()) {
         if(!ImageRegistration())
             return false; // cannot register all the images
         outlier_filtering_->Process(pointcloud, cameras);
